@@ -27,9 +27,9 @@ check_root() {
     fi
 }
 
-# 1. 调整 Linux 内核长肥管道 (BDP) 网络缓冲与队列调度
+# 1. 调整 Linux 内核长肥管道 (BDP) 网络缓冲与队列调度 (32MB 规格)
 tune_kernel() {
-    log_info "正在配置 Linux 内核网络栈与套接字缓冲区..."
+    log_info "正在配置 Linux 内核网络栈与套接字缓冲区 (32MB 规格)..."
 
     # 备份原有 sysctl 配置
     if [[ -f /etc/sysctl.conf && ! -f /etc/sysctl.conf.bak.turbo ]]; then
@@ -38,21 +38,21 @@ tune_kernel() {
     mkdir -p /etc/sysctl.d
 
     cat << 'EOF' > "$SYSCTL_CONF"
-# ====== hy2-net-turbo 自动调优配置 ======
-# 套接字最大收发缓冲区扩展 (16MB)，消除高吞吐下的溢出丢包
-net.core.rmem_max = 16777216
-net.core.wmem_max = 16777216
+# ====== hy2-net-turbo 自动调优配置 (32MB 旗舰规格) ======
+# 套接字最大收发缓冲区扩展 (32MB)，彻底消除高并发长肥管道溢出丢包
+net.core.rmem_max = 33554432
+net.core.wmem_max = 33554432
 
-# 默认套接字缓冲区 (1MB)
-net.core.rmem_default = 1048576
-net.core.wmem_default = 1048576
+# 默认套接字缓冲区 (2MB)
+net.core.rmem_default = 2097152
+net.core.wmem_default = 2097152
 
 # UDP 最小缓冲区保障
-net.ipv4.udp_rmem_min = 16384
-net.ipv4.udp_wmem_min = 16384
+net.ipv4.udp_rmem_min = 32768
+net.ipv4.udp_wmem_min = 32768
 
 # 网卡接收队列深度，强化瞬时突发吸附能力
-net.core.netdev_max_backlog = 10000
+net.core.netdev_max_backlog = 16384
 
 # 启用公平队列调度器 (Fair Queueing)
 net.core.default_qdisc = fq
@@ -60,7 +60,7 @@ net.core.default_qdisc = fq
 # 启用 BBR 拥塞控制
 net.ipv4.tcp_congestion_control = bbr
 
-# 路径 MTU 发现与排队保护
+# TCP 快速打开与闲置不减速
 net.ipv4.tcp_fastopen = 3
 net.ipv4.tcp_slow_start_after_idle = 0
 EOF
@@ -78,8 +78,8 @@ EOF
 
 # 2. 调整初始拥塞窗口 (InitCWND) 消除起步爬坡延迟并持久化
 tune_initcwnd() {
-    local target_cwnd=30
-    local target_rwnd=30
+    local target_cwnd=50
+    local target_rwnd=50
     log_info "正在配置默认路由初始拥塞窗口 (initcwnd=${target_cwnd}, initrwnd=${target_rwnd})..."
 
     # 提取默认路由网关和网卡
